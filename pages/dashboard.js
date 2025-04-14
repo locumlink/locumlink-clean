@@ -8,9 +8,17 @@ export default function Dashboard() {
   const [profile, setProfile] = useState(null)
   const [loading, setLoading] = useState(true)
 
-  useEffect(() => {
-    const fetchUserAndProfile = async () => {
-      const { data: { user }, error: userError } = await supabase.auth.getUser()
+import { useAuth } from '../context/AuthContext'
+
+...
+
+const { session } = useAuth()
+
+useEffect(() => {
+  const fetchUserAndProfile = async () => {
+    if (!session) return
+    const user = session.user
+
       if (userError || !user) {
         router.push('/register')
         return
@@ -37,7 +45,8 @@ export default function Dashboard() {
   }, [])
 
   if (loading) return <p style={{ padding: '2rem' }}>Loading dashboard...</p>
-  if (!profile) return <p>No profile found</p>
+  if (!profile && !loading) return <p>No profile found</p>
+
 
   return (
     <div style={{ padding: '2rem' }}>
