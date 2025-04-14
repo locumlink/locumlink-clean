@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/router'
 import { supabase } from '../utils/supabaseClient'
+import { useAuth } from '../context/AuthContext' // ⬅️ this line must be up here
+
 
 export default function Dashboard() {
   const router = useRouter()
