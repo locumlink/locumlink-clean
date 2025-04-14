@@ -1,40 +1,26 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/router'
 import { supabase } from '../utils/supabaseClient'
-import { useAuth } from '../context/AuthContext' // ⬅️ this line must be up here
-
+import { useAuth } from '../context/AuthContext'
 
 export default function Dashboard() {
   const router = useRouter()
-  const [user, setUser] = useState(null)
+  const { session } = useAuth()
   const [profile, setProfile] = useState(null)
   const [loading, setLoading] = useState(true)
 
-import { useAuth } from '../context/AuthContext'
+  useEffect(() => {
+    const fetchUserAndProfile = async () => {
+      if (!session) return
+      const user = session.user
 
-...
-
-const { session } = useAuth()
-
-useEffect(() => {
-  const fetchUserAndProfile = async () => {
-    if (!session) return
-    const user = session.user
-
-      if (userError || !user) {
-        router.push('/register')
-        return
-      }
-
-      setUser(user)
-
-      const { data: profileData, error: profileError } = await supabase
+      const { data: profileData, error } = await supabase
         .from('profiles')
         .select('*')
         .eq('user_id', user.id)
         .single()
 
-      if (profileError || !profileData) {
+      if (error || !profileData) {
         alert('Could not load profile')
         return
       }
@@ -44,11 +30,10 @@ useEffect(() => {
     }
 
     fetchUserAndProfile()
-  }, [])
+  }, [session])
 
   if (loading) return <p style={{ padding: '2rem' }}>Loading dashboard...</p>
-  if (!profile && !loading) return <p>No profile found</p>
-
+  if (!profile) return <p>No profile found</p>
 
   return (
     <div style={{ padding: '2rem' }}>
