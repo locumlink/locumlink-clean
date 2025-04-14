@@ -40,30 +40,43 @@ export default function Register() {
       return
     }
 
-    if (role === 'dentist') {
-      await supabase.from('dentist_details').insert([{
-        profile_id: profileData.id,
-        gdc_number: form.gdc_number,
-        performer_number: form.performer_number,
-        year_qualified: parseInt(form.year_qualified),
-        uk_experience: parseInt(form.uk_experience),
-        additional_skills: form.additional_skills.split(',').map(s => s.trim()),
-        locum_type: form.locum_type,
-        nhs_preference: form.nhs_preference,
-        rate_min: parseFloat(form.rate_min),
-        rate_max: parseFloat(form.rate_max),
-      }])
-    } else if (role === 'practice') {
-      await supabase.from('practice_details').insert([{
-        profile_id: profileData.id,
-        practice_name: form.practice_name,
-        principal_name: form.principal_name,
-        contact_email: form.contact_email,
-        contact_phone: form.contact_phone,
-      }])
-    }
+    let insertError = null
 
-    router.push('/dashboard')
+if (role === 'dentist') {
+  const { error } = await supabase.from('dentist_details').insert([{
+    profile_id: profileData.id,
+    gdc_number: form.gdc_number,
+    performer_number: form.performer_number,
+    year_qualified: parseInt(form.year_qualified),
+    uk_experience: parseInt(form.uk_experience),
+    additional_skills: form.additional_skills?.split(',').map(s => s.trim()),
+    locum_type: form.locum_type,
+    nhs_preference: form.nhs_preference,
+    rate_min: parseFloat(form.rate_min),
+    rate_max: parseFloat(form.rate_max),
+  }])
+  insertError = error
+}
+
+if (role === 'practice') {
+  const { error } = await supabase.from('practice_details').insert([{
+    profile_id: profileData.id,
+    practice_name: form.practice_name,
+    principal_name: form.principal_name,
+    contact_email: form.contact_email,
+    contact_phone: form.contact_phone,
+  }])
+  insertError = error
+}
+
+if (insertError) {
+  alert(`Insert error: ${insertError.message}`)
+  setLoading(false)
+  return
+}
+
+router.push('/dashboard')
+
   }
 
   return (
