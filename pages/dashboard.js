@@ -47,6 +47,9 @@ export default function Dashboard() {
 
           <h3 style={{ marginTop: '2rem' }}>My Bookings</h3>
           <DentistBookings dentistId={profile.id} />
+
+          <h3 style={{ marginTop: '2rem' }}>Pending Reviews</h3>
+          <PendingReviews profile={profile} />
         </>
       )}
 
@@ -61,6 +64,9 @@ export default function Dashboard() {
 
           <h3 style={{ marginTop: '2rem' }}>Enquiries Received</h3>
           <EnquiryList practiceId={profile.id} />
+
+          <h3 style={{ marginTop: '2rem' }}>Pending Reviews</h3>
+          <PendingReviews profile={profile} />
         </>
       )}
     </div>
@@ -227,6 +233,120 @@ function DentistBookings({ dentistId }) {
           <strong>{b.shifts.shift_date}</strong> – {b.shifts.location}<br />
           Rate: £{b.shifts.rate}<br />
           <em>Status: {b.status}</em>
+        </li>
+      ))}
+    </ul>
+  )
+}
+
+function PendingReviews({ profile }) {
+  const [pending, setPending] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [submitting, setSubmitting] = useState({}) // loading state per booking
+
+  const isDentist = profile.role === 'dentist'
+
+  useEffect(() => {
+    const fetchPending = async () => {
+      const today = new Date().toISOString().split('T')[0]
+
+      const { data: bookings, error } = await supabase
+        .from('bookings')
+        .select(`
+          id,
+          dentist_id,
+          shifts (
+            id,
+            shift_date,
+            location,
+            rate
+          )
+        `)
+        .eq(isDentist ? 'dentist_id' : 'practice_id', profile.id)
+        .eq('status', 'accepted')
+
+      if (error) {
+        console.error('Error fetching bookings:', error)
+        setLoading(false)
+        return
+      }
+
+      // Fetch all reviews already submitted
+      const { data: reviews, error: reviewErr } = await supabase
+        .from('reviews')
+        .select('*')
+        .eq('reviewer_id', profile.id)
+
+      const reviewedShiftIds = new Set(reviews.map(r => r.shift_id))
+
+      const pastUnreviewed = bookings.filter(b => {
+        const date = b.shifts?.shift_date
+        return date && date < today && !reviewedShiftIds.has(b.shifts.id)
+      })
+
+      setPending(pastUnreviewed)
+      setLoading(false)
+    }
+
+    fetchPending()
+  }, [profile])
+
+  const handleSubmit = async (booking, rating, comments) => {
+    setSubmitting(prev => ({ ...prev, [booking.id]: true }))
+
+    const recipientId = isDentist ? booking.shifts.practice_id : booking.dentist_id
+
+    const { error } = await supabase.from('reviews').insert([{
+      reviewer_id: profile.id,
+      recipient_id: recipientId,
+      shift_id: booking.shifts.id,
+      reviewer_role: profile.role,
+      rating,
+      comments
+    }])
+
+    if (error) {
+      alert('Error submitting review')
+      console.error(error)
+    } else {
+      setPending(prev => prev.filter(p => p.id !== booking.id))
+    }
+
+    setSubmitting(prev => ({ ...prev, [booking.id]: false }))
+  }
+
+  if (loading) return <p>Loading pending reviews...</p>
+  if (pending.length === 0) return <p>No reviews due right now.</p>
+
+  return (
+    <ul>
+      {pending.map((b) => (
+        <li key={b.id} style={{ border: '1px solid #ccc', padding: '1rem', margin: '1rem 0' }}>
+          <strong>{b.shifts.shift_date}</strong> – {b.shifts.location}<br />
+          Rate: £{b.shifts.rate}<br />
+          <form onSubmit={e => {
+            e.preventDefault()
+            const rating = parseInt(e.target.rating.value)
+            const comments = e.target.comments.value
+            handleSubmit(b, rating, comments)
+          }}>
+            <label>
+              Rating:
+              <select name="rating" defaultValue="5">
+                {[1,2,3,4,5].map(r => (
+                  <option key={r} value={r}>{r}</option>
+                ))}
+              </select>
+            </label>
+            <br />
+            <label>
+              Comments:
+              <br />
+              <textarea name="comments" rows="2" style={{ width: '100%' }} />
+            </label>
+            <br />
+            <button type="submit" disabled={submitting[b.id]}>Submit Review</button>
+          </form>
         </li>
       ))}
     </ul>
