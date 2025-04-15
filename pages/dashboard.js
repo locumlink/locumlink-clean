@@ -103,6 +103,25 @@ function EnquiryList({ practiceId }) {
   const [bookings, setBookings] = useState([])
   const [loading, setLoading] = useState(true)
 
+  const handleAccept = async (bookingId) => {
+    const { error } = await supabase
+      .from('bookings')
+      .update({ status: 'accepted' })
+      .eq('id', bookingId)
+
+    if (error) {
+      alert('Error accepting booking')
+      console.error(error)
+    } else {
+      alert('Booking accepted!')
+      setBookings((prev) =>
+        prev.map((b) =>
+          b.id === bookingId ? { ...b, status: 'accepted' } : b
+        )
+      )
+    }
+  }
+
   useEffect(() => {
     const fetchEnquiries = async () => {
       const { data, error } = await supabase
@@ -151,7 +170,10 @@ function EnquiryList({ practiceId }) {
         <li key={b.id} style={{ border: '1px solid #ccc', padding: '1rem', margin: '1rem 0' }}>
           <strong>{b.shifts.shift_date}</strong> – {b.shifts.location}<br />
           Rate: £{b.shifts.rate}<br />
-          <em>Status: {b.status}</em><br /><br />
+          <em>Status: {b.status}</em><br />
+          {b.status === 'pending' && (
+            <button onClick={() => handleAccept(b.id)}>Accept Booking</button>
+          )}<br /><br />
           <strong>Dentist:</strong> {b.dentist?.full_name} ({b.dentist?.email})
         </li>
       ))}
