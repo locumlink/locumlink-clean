@@ -81,28 +81,32 @@ export default function PostShift() {
           Date:<br />
           <input type="date" name="shift_date" value={formData.shift_date} onChange={handleChange} required />
         </label><br /><br />
+
         <label>
           Shift Type:<br />
           <select name="shift_type" value={formData.shift_type} onChange={handleChange} required>
             <option value="">Select</option>
-            <option value="Full Day">Full Day</option>
-            <option value="Half Day">Half Day</option>
-            <option value="AM">AM</option>
-            <option value="PM">PM</option>
+            <option value="nhs">NHS</option>
+            <option value="private">Private</option>
+            <option value="mixed">Mixed</option>
           </select>
         </label><br /><br />
+
         <label>
           Rate (£):<br />
           <input type="number" name="rate" value={formData.rate} onChange={handleChange} required />
         </label><br /><br />
+
         <label>
           Postcode:<br />
           <input type="text" name="location" value={formData.location} onChange={handleChange} required />
         </label><br /><br />
+
         <label>
           Description:<br />
           <textarea name="description" value={formData.description} onChange={handleChange} rows="4" />
         </label><br /><br />
+
         <button type="submit" disabled={submitting}>{submitting ? 'Posting...' : 'Post Shift'}</button>
       </form>
     </div>
