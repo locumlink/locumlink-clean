@@ -7,8 +7,11 @@ export default function BrowseShifts() {
   const [profile, setProfile] = useState(null)
   const [shifts, setShifts] = useState([])
   const [loading, setLoading] = useState(false)
+
   const [postcode, setPostcode] = useState('')
-  const [radius, setRadius] = useState(20) // default to 20km
+  const [radius, setRadius] = useState(20)
+  const [shiftType, setShiftType] = useState('')
+  const [minRate, setMinRate] = useState('')
 
   useEffect(() => {
     if (!session) return
@@ -24,7 +27,7 @@ export default function BrowseShifts() {
   }, [session])
 
   const haversineDistance = (lat1, lon1, lat2, lon2) => {
-    const R = 6371 // km
+    const R = 6371
     const toRad = x => (x * Math.PI) / 180
     const dLat = toRad(lat2 - lat1)
     const dLon = toRad(lon2 - lon1)
@@ -36,7 +39,7 @@ export default function BrowseShifts() {
     return R * c
   }
 
-  const fetchShiftsByDistance = async () => {
+  const fetchShifts = async () => {
     if (!postcode) {
       alert('Please enter a postcode')
       return
@@ -61,7 +64,9 @@ export default function BrowseShifts() {
 
       const filtered = shiftsData.filter(shift => {
         const distance = haversineDistance(latitude, longitude, shift.latitude, shift.longitude)
-        return distance <= radius
+        const matchesType = shiftType ? shift.shift_type === shiftType : true
+        const matchesRate = minRate ? shift.rate >= parseFloat(minRate) : true
+        return distance <= radius && matchesType && matchesRate
       })
 
       setShifts(filtered)
@@ -86,6 +91,7 @@ export default function BrowseShifts() {
         />
       </label>
       <br /><br />
+
       <label>
         Radius (km):
         <input
@@ -97,19 +103,46 @@ export default function BrowseShifts() {
         />
       </label>
       <br /><br />
-      <button onClick={fetchShiftsByDistance}>Search</button>
+
+      <label>
+        NHS/Private/Mixed:
+        <select value={shiftType} onChange={(e) => setShiftType(e.target.value)} style={{ marginLeft: '1rem' }}>
+          <option value="">Any</option>
+          <option value="nhs">NHS</option>
+          <option value="private">Private</option>
+          <option value="mixed">Mixed</option>
+        </select>
+      </label>
+      <br /><br />
+
+      <label>
+        Minimum Rate (£):
+        <input
+          type="number"
+          value={minRate}
+          onChange={(e) => setMinRate(e.target.value)}
+          style={{ marginLeft: '1rem' }}
+        />
+      </label>
+      <br /><br />
+
+      <button onClick={fetchShifts}>Search</button>
 
       {loading ? (
         <p>Loading shifts...</p>
       ) : (
         <ul>
-          {shifts.map(shift => (
-            <li key={shift.id} style={{ border: '1px solid #ccc', padding: '1rem', margin: '1rem 0' }}>
-              <strong>{shift.shift_date}</strong> – {shift.shift_type}<br />
-              {shift.location} – £{shift.rate}<br />
-              {shift.description}
-            </li>
-          ))}
+          {shifts.length === 0 ? (
+            <p>No matching shifts found.</p>
+          ) : (
+            shifts.map((shift) => (
+              <li key={shift.id} style={{ border: '1px solid #ccc', padding: '1rem', margin: '1rem 0' }}>
+                <strong>{shift.shift_date}</strong> – {shift.shift_type}<br />
+                {shift.location} – £{shift.rate}<br />
+                {shift.description}
+              </li>
+            ))
+          )}
         </ul>
       )}
     </div>
