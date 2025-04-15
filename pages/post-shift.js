@@ -56,9 +56,12 @@ export default function PostShift() {
       description: form.description
     }])
 
-    if (error) {
-      setError('Failed to post shift')
-      setLoading(false)
+if (error) {
+  console.error('Supabase error:', error)
+  setError(error.message || 'Failed to post shift')
+  setLoading(false)
+}
+
     } else {
       router.push('/dashboard')
     }
