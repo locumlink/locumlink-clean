@@ -182,7 +182,13 @@ function EnquiryList({ practiceId }) {
           <em>Status: {b.status}</em><br />
           {b.status === 'pending' && (
             <button onClick={() => handleAccept(b.id)}>Accept Booking</button>
-          )}<br /><br />
+          )}
+          {b.status === 'accepted' && (
+            <a href={`/chat/${b.id}`}>
+              <button style={{ marginTop: '0.5rem' }}>Open Chat</button>
+            </a>
+          )}
+          <br /><br />
           <strong>Dentist:</strong> {b.dentist?.full_name} ({b.dentist?.email})
         </li>
       ))}
@@ -232,7 +238,12 @@ function DentistBookings({ dentistId }) {
         <li key={b.id} style={{ border: '1px solid #ccc', padding: '1rem', margin: '1rem 0' }}>
           <strong>{b.shifts.shift_date}</strong> – {b.shifts.location}<br />
           Rate: £{b.shifts.rate}<br />
-          <em>Status: {b.status}</em>
+          <em>Status: {b.status}</em><br />
+          {b.status === 'accepted' && (
+            <a href={`/chat/${b.id}`}>
+              <button style={{ marginTop: '0.5rem' }}>Open Chat</button>
+            </a>
+          )}
         </li>
       ))}
     </ul>
@@ -242,7 +253,7 @@ function DentistBookings({ dentistId }) {
 function PendingReviews({ profile }) {
   const [pending, setPending] = useState([])
   const [loading, setLoading] = useState(true)
-  const [submitting, setSubmitting] = useState({}) // loading state per booking
+  const [submitting, setSubmitting] = useState({})
 
   const isDentist = profile.role === 'dentist'
 
@@ -259,7 +270,8 @@ function PendingReviews({ profile }) {
             id,
             shift_date,
             location,
-            rate
+            rate,
+            practice_id
           )
         `)
         .eq(isDentist ? 'dentist_id' : 'practice_id', profile.id)
@@ -271,7 +283,6 @@ function PendingReviews({ profile }) {
         return
       }
 
-      // Fetch all reviews already submitted
       const { data: reviews, error: reviewErr } = await supabase
         .from('reviews')
         .select('*')
@@ -333,7 +344,7 @@ function PendingReviews({ profile }) {
             <label>
               Rating:
               <select name="rating" defaultValue="5">
-                {[1,2,3,4,5].map(r => (
+                {[1, 2, 3, 4, 5].map(r => (
                   <option key={r} value={r}>{r}</option>
                 ))}
               </select>
