@@ -102,6 +102,13 @@ export default function BrowseShifts() {
     return R * c
   }
 
+  // Round coords for map pins
+  const roundedForMap = filteredShifts.map(shift => ({
+    ...shift,
+    latitude: Math.round(shift.latitude * 10) / 10,
+    longitude: Math.round(shift.longitude * 10) / 10
+  }))
+
   if (loading) return <p style={{ padding: '2rem' }}>Loading shifts...</p>
   if (!profile) return <p>No profile found</p>
 
@@ -166,7 +173,7 @@ export default function BrowseShifts() {
 
       <p>Showing {filteredShifts.length} results within {radius} miles</p>
 
-      <MapWithNoSSR shifts={filteredShifts} />
+      <MapWithNoSSR shifts={roundedForMap} />
 
       <ul>
         {filteredShifts.map((shift) => (
