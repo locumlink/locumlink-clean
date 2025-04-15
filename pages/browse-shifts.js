@@ -7,6 +7,7 @@ export default function BrowseShifts() {
   const [profile, setProfile] = useState(null)
   const [shifts, setShifts] = useState([])
   const [loading, setLoading] = useState(false)
+  const [resultSummary, setResultSummary] = useState('')
 
   const [postcode, setPostcode] = useState('')
   const [radius, setRadius] = useState(20)
@@ -70,11 +71,31 @@ export default function BrowseShifts() {
       })
 
       setShifts(filtered)
+      setResultSummary(`Showing ${filtered.length} shift${filtered.length === 1 ? '' : 's'} within ${radius}km of ${postcode.toUpperCase()}`)
     } catch (err) {
       console.error(err)
       alert('Failed to fetch shifts')
+      setShifts([])
+      setResultSummary('')
     }
     setLoading(false)
+  }
+
+  const handleEnquire = async (shiftId) => {
+    if (!profile) return
+
+    const { error } = await supabase.from('bookings').insert([{
+      shift_id: shiftId,
+      dentist_id: profile.id,
+      status: 'pending'
+    }])
+
+    if (error) {
+      alert('Failed to submit enquiry')
+      console.error(error)
+    } else {
+      alert('Enquiry submitted!')
+    }
   }
 
   return (
@@ -89,8 +110,7 @@ export default function BrowseShifts() {
           onChange={(e) => setPostcode(e.target.value)}
           style={{ marginLeft: '1rem' }}
         />
-      </label>
-      <br /><br />
+      </label><br /><br />
 
       <label>
         Radius (km):
@@ -101,8 +121,7 @@ export default function BrowseShifts() {
           min={1}
           style={{ marginLeft: '1rem' }}
         />
-      </label>
-      <br /><br />
+      </label><br /><br />
 
       <label>
         NHS/Private/Mixed:
@@ -112,8 +131,7 @@ export default function BrowseShifts() {
           <option value="private">Private</option>
           <option value="mixed">Mixed</option>
         </select>
-      </label>
-      <br /><br />
+      </label><br /><br />
 
       <label>
         Minimum Rate (£):
@@ -123,27 +141,32 @@ export default function BrowseShifts() {
           onChange={(e) => setMinRate(e.target.value)}
           style={{ marginLeft: '1rem' }}
         />
-      </label>
-      <br /><br />
+      </label><br /><br />
 
-      <button onClick={fetchShifts}>Search</button>
+      <button onClick={fetchShifts}>Search</button><br /><br />
 
       {loading ? (
         <p>Loading shifts...</p>
       ) : (
-        <ul>
-          {shifts.length === 0 ? (
-            <p>No matching shifts found.</p>
-          ) : (
-            shifts.map((shift) => (
-              <li key={shift.id} style={{ border: '1px solid #ccc', padding: '1rem', margin: '1rem 0' }}>
-                <strong>{shift.shift_date}</strong> – {shift.shift_type}<br />
-                {shift.location} – £{shift.rate}<br />
-                {shift.description}
-              </li>
-            ))
-          )}
-        </ul>
+        <>
+          {resultSummary && <p><strong>{resultSummary}</strong></p>}
+          <ul>
+            {shifts.length === 0 ? (
+              <p>No matching shifts found.</p>
+            ) : (
+              shifts.map((shift) => (
+                <li key={shift.id} style={{ border: '1px solid #ccc', padding: '1rem', margin: '1rem 0' }}>
+                  <strong>{shift.shift_date}</strong> – {shift.shift_type}<br />
+                  {shift.location} – £{shift.rate}<br />
+                  {shift.description}<br /><br />
+                  <button onClick={() => handleEnquire(shift.id)}>
+                    Enquire
+                  </button>
+                </li>
+              ))
+            )}
+          </ul>
+        </>
       )}
     </div>
   )
