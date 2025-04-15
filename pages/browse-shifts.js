@@ -41,7 +41,7 @@ export default function BrowseShifts() {
         return
       }
 
-      // Exclude shifts posted by self (not needed if no dentists post, but safe)
+      // Exclude shifts posted by self
       const filtered = shiftsData.filter(
         (shift) => shift.practice_id !== profileData.id
       )
@@ -52,6 +52,23 @@ export default function BrowseShifts() {
 
     fetchData()
   }, [session])
+
+  const handleEnquire = async (shiftId) => {
+    if (!profile) return
+
+    const { data, error } = await supabase.from('bookings').insert([{
+      shift_id: shiftId,
+      dentist_id: profile.id,
+      status: 'pending'
+    }])
+
+    if (error) {
+      alert('Failed to submit enquiry')
+      console.error(error)
+    } else {
+      alert('Enquiry submitted!')
+    }
+  }
 
   if (loading) return <p style={{ padding: '2rem' }}>Loading shifts...</p>
   if (!profile) return <p>No profile found</p>
@@ -67,7 +84,11 @@ export default function BrowseShifts() {
           <li key={shift.id} style={{ border: '1px solid #ccc', padding: '1rem', margin: '1rem 0' }}>
             <strong>{shift.shift_date}</strong> – {shift.shift_type}<br />
             {shift.location} – £{shift.rate}<br />
-            {shift.description}
+            {shift.description}<br /><br />
+
+            <button onClick={() => handleEnquire(shift.id)}>
+              Enquire
+            </button>
           </li>
         ))}
       </ul>
