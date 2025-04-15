@@ -29,6 +29,7 @@ export default function PostShift() {
         .single()
 
       if (error) {
+        console.error('Profile fetch error:', error)
         setError('Failed to load profile')
       } else {
         setProfile(data)
@@ -47,6 +48,8 @@ export default function PostShift() {
     setLoading(true)
     setError(null)
 
+    console.log('Posting shift with profile ID:', profile.id)
+
     const { error } = await supabase.from('shifts').insert([{
       practice_id: profile.id,
       shift_date: form.shift_date,
@@ -56,12 +59,10 @@ export default function PostShift() {
       description: form.description
     }])
 
-if (error) {
-  console.error('Supabase error:', error)
-  setError(error.message || 'Failed to post shift')
-  setLoading(false)
-}
-
+    if (error) {
+      console.error('Supabase error:', error)
+      setError(error.message || 'Failed to post shift')
+      setLoading(false)
     } else {
       router.push('/dashboard')
     }
@@ -74,19 +75,19 @@ if (error) {
       <h2>Post a Shift</h2>
       <form onSubmit={handleSubmit}>
         <label>Date:</label><br />
-        <input type="date" name="shift_date" value={form.shift_date} onChange={handleInput} required /><br />
+        <input type="date" name="shift_date" value={form.shift_date} onChange={handleInput} required /><br /><br />
 
         <label>Shift Type (NHS/Private):</label><br />
-        <input type="text" name="shift_type" value={form.shift_type} onChange={handleInput} required /><br />
+        <input type="text" name="shift_type" value={form.shift_type} onChange={handleInput} required /><br /><br />
 
         <label>Rate (£):</label><br />
-        <input type="number" name="rate" value={form.rate} onChange={handleInput} required /><br />
+        <input type="number" name="rate" value={form.rate} onChange={handleInput} required /><br /><br />
 
         <label>Location:</label><br />
-        <input type="text" name="location" value={form.location} onChange={handleInput} required /><br />
+        <input type="text" name="location" value={form.location} onChange={handleInput} required /><br /><br />
 
         <label>Notes (optional):</label><br />
-        <textarea name="description" value={form.description} onChange={handleInput}></textarea><br />
+        <textarea name="description" value={form.description} onChange={handleInput}></textarea><br /><br />
 
         <button type="submit" disabled={loading}>
           {loading ? 'Posting...' : 'Post Shift'}
