@@ -52,9 +52,46 @@ export default function Dashboard() {
           <h2>Your Practice Info</h2>
           <p>Email: {profile.email}</p>
           <p>Postcode: {profile.postcode}</p>
-          <p>(Placeholder: Add and manage shifts here)</p>
+
+          <h3 style={{ marginTop: '2rem' }}>Posted Shifts</h3>
+          <PracticeShifts practiceId={profile.id} />
         </>
       )}
     </div>
+  )
+}
+
+function PracticeShifts({ practiceId }) {
+  const [shifts, setShifts] = useState([])
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    const fetchShifts = async () => {
+      const { data, error } = await supabase
+        .from('shifts')
+        .select('*')
+        .eq('practice_id', practiceId)
+        .order('shift_date', { ascending: true })
+
+      if (!error) setShifts(data)
+      setLoading(false)
+    }
+
+    fetchShifts()
+  }, [practiceId])
+
+  if (loading) return <p>Loading shifts...</p>
+  if (shifts.length === 0) return <p>No shifts posted yet.</p>
+
+  return (
+    <ul>
+      {shifts.map((shift) => (
+        <li key={shift.id} style={{ border: '1px solid #ccc', padding: '1rem', margin: '1rem 0' }}>
+          <strong>{shift.shift_date}</strong> – {shift.shift_type}<br />
+          {shift.location} – £{shift.rate}<br />
+          {shift.description}
+        </li>
+      ))}
+    </ul>
   )
 }
