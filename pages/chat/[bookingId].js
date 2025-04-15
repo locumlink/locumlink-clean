@@ -43,8 +43,29 @@ export default function ChatPage() {
     setMessages(data)
   }
 
+  const containsContactInfo = (text) => {
+    const contactPatterns = [
+      /\b\d{10,}\b/, // long numbers (e.g., phone)
+      /\b0\d{9,}\b/, // UK phone format
+      /\+44\s?\d{9,}/, // international UK format
+      /@\w+\.\w+/, // email-like
+      /\bemail\b/i,
+      /\bphone\b/i,
+      /\bcall me\b/i,
+      /\btext me\b/i,
+      /\bmessage me\b/i,
+      /instagram|facebook|snapchat|tiktok|twitter/i,
+    ]
+    return contactPatterns.some((regex) => regex.test(text))
+  }
+
   const sendMessage = async () => {
     if (!newMessage.trim()) return
+
+    if (containsContactInfo(newMessage)) {
+      alert('Sorry — please don’t share contact details in messages. Use this chat to coordinate only.')
+      return
+    }
 
     const { error } = await supabase.from('messages').insert([{
       chat_id: bookingId,
@@ -86,7 +107,14 @@ export default function ChatPage() {
   return (
     <div style={{ padding: '2rem' }}>
       <h2>Chat for Shift on {booking.shifts?.shift_date}</h2>
-      <div style={{ border: '1px solid #ccc', padding: '1rem', height: '300px', overflowY: 'scroll', marginBottom: '1rem' }}>
+      <div style={{
+        border: '1px solid #ccc',
+        padding: '1rem',
+        height: '300px',
+        overflowY: 'scroll',
+        marginBottom: '1rem',
+        background: '#f9f9f9'
+      }}>
         {messages.map((msg) => (
           <div key={msg.id} style={{ marginBottom: '0.5rem' }}>
             <strong>{getSenderLabel(msg)}</strong>: {msg.message}
