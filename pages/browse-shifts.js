@@ -1,127 +1,117 @@
 import { useEffect, useState } from 'react'
-import { useRouter } from 'next/router'
 import { supabase } from '../utils/supabaseClient'
 import { useAuth } from '../context/AuthContext'
 
 export default function BrowseShifts() {
-  const router = useRouter()
   const { session } = useAuth()
   const [profile, setProfile] = useState(null)
   const [shifts, setShifts] = useState([])
-  const [loading, setLoading] = useState(true)
-
-  // Filter controls
-  const [filterType, setFilterType] = useState('')
-  const [minRate, setMinRate] = useState('')
+  const [loading, setLoading] = useState(false)
+  const [postcode, setPostcode] = useState('')
+  const [radius, setRadius] = useState(20) // default to 20km
 
   useEffect(() => {
-    const fetchData = async () => {
-      if (!session) return
-      const user = session.user
-
-      const { data: profileData, error: profileError } = await supabase
+    if (!session) return
+    const fetchProfile = async () => {
+      const { data, error } = await supabase
         .from('profiles')
         .select('*')
-        .eq('user_id', user.id)
+        .eq('user_id', session.user.id)
         .single()
-
-      if (profileError) {
-        alert('Failed to load profile')
-        return
-      }
-
-      setProfile(profileData)
-
-      const today = new Date().toISOString().split('T')[0]
-
-      const { data: shiftsData, error: shiftsError } = await supabase
-        .from('shifts')
-        .select('*')
-        .gt('shift_date', today)
-        .order('shift_date', { ascending: true })
-
-      if (shiftsError) {
-        alert('Failed to load shifts')
-        return
-      }
-
-      const filtered = shiftsData.filter(
-        (shift) => shift.practice_id !== profileData.id
-      )
-
-      setShifts(filtered)
-      setLoading(false)
+      if (!error) setProfile(data)
     }
-
-    fetchData()
+    fetchProfile()
   }, [session])
 
-  const handleEnquire = async (shiftId) => {
-    if (!profile) return
-
-    const { data, error } = await supabase.from('bookings').insert([{
-      shift_id: shiftId,
-      dentist_id: profile.id,
-      status: 'pending'
-    }])
-
-    if (error) {
-      alert('Failed to submit enquiry')
-      console.error(error)
-    } else {
-      alert('Enquiry submitted!')
-    }
+  const haversineDistance = (lat1, lon1, lat2, lon2) => {
+    const R = 6371 // km
+    const toRad = x => (x * Math.PI) / 180
+    const dLat = toRad(lat2 - lat1)
+    const dLon = toRad(lon2 - lon1)
+    const a =
+      Math.sin(dLat / 2) ** 2 +
+      Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) *
+      Math.sin(dLon / 2) ** 2
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
+    return R * c
   }
 
-  const filteredShifts = shifts.filter(shift => {
-    if (filterType && shift.shift_type !== filterType) return false
-    if (minRate && shift.rate < parseFloat(minRate)) return false
-    return true
-  })
+  const fetchShiftsByDistance = async () => {
+    if (!postcode) {
+      alert('Please enter a postcode')
+      return
+    }
 
-  if (loading) return <p style={{ padding: '2rem' }}>Loading shifts...</p>
-  if (!profile) return <p>No profile found</p>
+    setLoading(true)
+    try {
+      const geoRes = await fetch(`https://api.postcodes.io/postcodes/${encodeURIComponent(postcode)}`)
+      const geoData = await geoRes.json()
+
+      if (geoData.status !== 200) throw new Error('Postcode not found')
+
+      const { latitude, longitude } = geoData.result
+
+      const { data: shiftsData, error } = await supabase
+        .from('shifts')
+        .select('*')
+        .gt('shift_date', new Date().toISOString().split('T')[0])
+        .order('shift_date', { ascending: true })
+
+      if (error) throw error
+
+      const filtered = shiftsData.filter(shift => {
+        const distance = haversineDistance(latitude, longitude, shift.latitude, shift.longitude)
+        return distance <= radius
+      })
+
+      setShifts(filtered)
+    } catch (err) {
+      console.error(err)
+      alert('Failed to fetch shifts')
+    }
+    setLoading(false)
+  }
 
   return (
     <div style={{ padding: '2rem' }}>
-      <h2>Shifts Available Near You</h2>
+      <h2>Find Locum Shifts Near You</h2>
 
-      <div style={{ marginBottom: '1rem' }}>
-        <label>
-          Shift Type:{' '}
-          <select value={filterType} onChange={(e) => setFilterType(e.target.value)}>
-            <option value="">All</option>
-            <option value="nhs">NHS</option>
-            <option value="private">Private</option>
-            <option value="mixed">Mixed</option>
-          </select>
-        </label>
+      <label>
+        Your Postcode:
+        <input
+          type="text"
+          value={postcode}
+          onChange={(e) => setPostcode(e.target.value)}
+          style={{ marginLeft: '1rem' }}
+        />
+      </label>
+      <br /><br />
+      <label>
+        Radius (km):
+        <input
+          type="number"
+          value={radius}
+          onChange={(e) => setRadius(Number(e.target.value))}
+          min={1}
+          style={{ marginLeft: '1rem' }}
+        />
+      </label>
+      <br /><br />
+      <button onClick={fetchShiftsByDistance}>Search</button>
 
-        <label style={{ marginLeft: '2rem' }}>
-          Min Rate (£):{' '}
-          <input
-            type="number"
-            value={minRate}
-            onChange={(e) => setMinRate(e.target.value)}
-            style={{ width: '80px' }}
-          />
-        </label>
-      </div>
-
-      {filteredShifts.length === 0 && <p>No matching shifts found.</p>}
-
-      <ul>
-        {filteredShifts.map((shift) => (
-          <li key={shift.id} style={{ border: '1px solid #ccc', padding: '1rem', margin: '1rem 0' }}>
-            <strong>{shift.shift_date}</strong> – {shift.shift_type.toUpperCase()}<br />
-            {shift.location} – £{shift.rate}<br />
-            {shift.description}<br /><br />
-            <button onClick={() => handleEnquire(shift.id)}>
-              Enquire
-            </button>
-          </li>
-        ))}
-      </ul>
+      {loading ? (
+        <p>Loading shifts...</p>
+      ) : (
+        <ul>
+          {shifts.map(shift => (
+            <li key={shift.id} style={{ border: '1px solid #ccc', padding: '1rem', margin: '1rem 0' }}>
+              <strong>{shift.shift_date}</strong> – {shift.shift_type}<br />
+              {shift.location} – £{shift.rate}<br />
+              {shift.description}
+            </li>
+          ))}
+        </ul>
+      )}
     </div>
   )
 }
