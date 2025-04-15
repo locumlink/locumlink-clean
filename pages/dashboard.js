@@ -44,6 +44,9 @@ export default function Dashboard() {
         <>
           <h2>Your Availability</h2>
           <p>(Placeholder: Shifts near your postcode will be listed here)</p>
+
+          <h3 style={{ marginTop: '2rem' }}>My Bookings</h3>
+          <DentistBookings dentistId={profile.id} />
         </>
       )}
 
@@ -175,6 +178,55 @@ function EnquiryList({ practiceId }) {
             <button onClick={() => handleAccept(b.id)}>Accept Booking</button>
           )}<br /><br />
           <strong>Dentist:</strong> {b.dentist?.full_name} ({b.dentist?.email})
+        </li>
+      ))}
+    </ul>
+  )
+}
+
+function DentistBookings({ dentistId }) {
+  const [bookings, setBookings] = useState([])
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    const fetchMyBookings = async () => {
+      const { data, error } = await supabase
+        .from('bookings')
+        .select(`
+          id,
+          status,
+          shifts (
+            shift_date,
+            location,
+            rate
+          )
+        `)
+        .eq('dentist_id', dentistId)
+        .order('created_at', { ascending: false })
+
+      if (error) {
+        console.error('Error fetching my bookings:', error)
+        setLoading(false)
+        return
+      }
+
+      setBookings(data)
+      setLoading(false)
+    }
+
+    fetchMyBookings()
+  }, [dentistId])
+
+  if (loading) return <p>Loading your bookings...</p>
+  if (bookings.length === 0) return <p>You have no bookings yet.</p>
+
+  return (
+    <ul>
+      {bookings.map((b) => (
+        <li key={b.id} style={{ border: '1px solid #ccc', padding: '1rem', margin: '1rem 0' }}>
+          <strong>{b.shifts.shift_date}</strong> – {b.shifts.location}<br />
+          Rate: £{b.shifts.rate}<br />
+          <em>Status: {b.status}</em>
         </li>
       ))}
     </ul>
