@@ -55,6 +55,9 @@ export default function Dashboard() {
 
           <h3 style={{ marginTop: '2rem' }}>Posted Shifts</h3>
           <PracticeShifts practiceId={profile.id} />
+
+          <h3 style={{ marginTop: '2rem' }}>Enquiries Received</h3>
+          <EnquiryList practiceId={profile.id} />
         </>
       )}
     </div>
@@ -90,6 +93,66 @@ function PracticeShifts({ practiceId }) {
           <strong>{shift.shift_date}</strong> – {shift.shift_type}<br />
           {shift.location} – £{shift.rate}<br />
           {shift.description}
+        </li>
+      ))}
+    </ul>
+  )
+}
+
+function EnquiryList({ practiceId }) {
+  const [bookings, setBookings] = useState([])
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    const fetchEnquiries = async () => {
+      const { data, error } = await supabase
+        .from('bookings')
+        .select(`
+          id,
+          status,
+          shift_id,
+          shifts (
+            id,
+            practice_id,
+            shift_date,
+            location,
+            rate
+          ),
+          dentist:dentist_id (
+            full_name,
+            email
+          )
+        `)
+        .order('created_at', { ascending: false })
+
+      if (error) {
+        console.error('Error fetching bookings:', error)
+        setLoading(false)
+        return
+      }
+
+      const filtered = data.filter(
+        (booking) => booking.shifts && booking.shifts.practice_id === practiceId
+      )
+
+      setBookings(filtered)
+      setLoading(false)
+    }
+
+    fetchEnquiries()
+  }, [practiceId])
+
+  if (loading) return <p>Loading enquiries...</p>
+  if (bookings.length === 0) return <p>No enquiries yet.</p>
+
+  return (
+    <ul>
+      {bookings.map((b) => (
+        <li key={b.id} style={{ border: '1px solid #ccc', padding: '1rem', margin: '1rem 0' }}>
+          <strong>{b.shifts.shift_date}</strong> – {b.shifts.location}<br />
+          Rate: £{b.shifts.rate}<br />
+          <em>Status: {b.status}</em><br /><br />
+          <strong>Dentist:</strong> {b.dentist?.full_name} ({b.dentist?.email})
         </li>
       ))}
     </ul>
