@@ -143,22 +143,14 @@ function DentistBookings({ profile }) {
       const { data, error } = await supabase
         .from('bookings')
         .select(`
-          id,
-          status,
-          practice_confirmed,
-          dentist_confirmed,
-          shifts (
-            id,
-            shift_date,
-            location,
-            rate,
-            practice_id
-          ),
-          practice:shifts!inner.practice_id (
-            id,
-            full_name,
-            email,
-            phone
+          id, status, practice_confirmed, dentist_confirmed,
+          shifts (shift_date, location, rate, practice_id),
+          shifts.practice_id (
+            practice_details (
+              practice_name,
+              contact_email,
+              contact_phone
+            )
           )
         `)
         .eq('dentist_id', profile.id)
@@ -171,16 +163,17 @@ function DentistBookings({ profile }) {
 
       setBookings(data || [])
     }
-
     fetch()
   }, [profile.id])
 
   const confirm = async (bookingId) => {
-    await supabase.from('bookings').update({ dentist_confirmed: true }).eq('id', bookingId)
+    await supabase
+      .from('bookings')
+      .update({ dentist_confirmed: true })
+      .eq('id', bookingId)
+
     setBookings(prev =>
-      prev.map(b =>
-        b.id === bookingId ? { ...b, dentist_confirmed: true } : b
-      )
+      prev.map(b => b.id === bookingId ? { ...b, dentist_confirmed: true } : b)
     )
   }
 
@@ -188,16 +181,7 @@ function DentistBookings({ profile }) {
     <ul>
       {bookings.map(b => {
         const bothConfirmed = b.practice_confirmed && b.dentist_confirmed
-        const contactDetails = bothConfirmed ? (
-          <>
-            <p><strong>Practice Contact:</strong></p>
-            <p>Email: {b.practice?.email || 'N/A'}</p>
-            <p>Phone: {b.practice?.phone || 'N/A'}</p>
-          </>
-        ) : (
-          <p><em>Contact details will appear once booking is confirmed by both sides.</em></p>
-        )
-
+        const contact = b.shifts?.practice_id?.practice_details
         return (
           <li key={b.id} style={{ marginBottom: '1rem', border: '1px solid #ccc', padding: '1rem' }}>
             <strong>{b.shifts.shift_date}</strong> – {b.shifts.location}<br />
@@ -211,8 +195,16 @@ function DentistBookings({ profile }) {
                 Confirm Booking
               </button>
             )}
-            {bothConfirmed && <p><strong>Booking fully confirmed!</strong></p>}
-            {contactDetails}
+            {bothConfirmed && (
+              <div style={{ marginTop: '1rem' }}>
+                <p><strong>Booking fully confirmed!</strong></p>
+                <p>
+                  Practice: {contact?.practice_name || 'N/A'}<br />
+                  Email: {contact?.contact_email || 'N/A'}<br />
+                  Phone: {contact?.contact_phone || 'N/A'}
+                </p>
+              </div>
+            )}
           </li>
         )
       })}
