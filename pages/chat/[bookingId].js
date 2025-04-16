@@ -12,6 +12,7 @@ export default function ChatPage() {
   const [messages, setMessages] = useState([])
   const [newMessage, setNewMessage] = useState('')
   const [loading, setLoading] = useState(true)
+  const [confirming, setConfirming] = useState(false)
 
   const fetchProfile = async () => {
     const { data, error } = await supabase
@@ -45,10 +46,10 @@ export default function ChatPage() {
 
   const containsContactInfo = (text) => {
     const contactPatterns = [
-      /\b\d{10,}\b/, // long numbers (e.g., phone)
-      /\b0\d{9,}\b/, // UK phone format
-      /\+44\s?\d{9,}/, // international UK format
-      /@\w+\.\w+/, // email-like
+      /\b\d{10,}\b/,
+      /\b0\d{9,}\b/,
+      /\+44\s?\d{9,}/,
+      /@\w+\.\w+/,
       /\bemail\b/i,
       /\bphone\b/i,
       /\bcall me\b/i,
@@ -61,9 +62,8 @@ export default function ChatPage() {
 
   const sendMessage = async () => {
     if (!newMessage.trim()) return
-
     if (containsContactInfo(newMessage)) {
-      alert('Sorry — please don’t share contact details in messages. Use this chat to coordinate only.')
+      alert('Please don’t share contact details in chat.')
       return
     }
 
@@ -73,30 +73,45 @@ export default function ChatPage() {
       message: newMessage
     }])
 
-    if (error) return console.error(error)
+    if (!error) {
+      setNewMessage('')
+      fetchMessages()
+    }
+  }
 
-    setNewMessage('')
-    fetchMessages()
+  const confirmBooking = async () => {
+    setConfirming(true)
+    const columnToUpdate = booking.dentist_id === profile.id
+      ? 'dentist_confirmed'
+      : 'practice_confirmed'
+
+    const { error } = await supabase
+      .from('bookings')
+      .update({ [columnToUpdate]: true })
+      .eq('id', bookingId)
+
+    if (!error) fetchBooking()
+    else alert('Error confirming shift')
+
+    setConfirming(false)
   }
 
   useEffect(() => {
-    if (!bookingId || !session) return
-    fetchProfile()
+    if (bookingId && session) fetchProfile()
   }, [session, bookingId])
 
   useEffect(() => {
-    if (!profile || !bookingId) return
-    fetchBooking()
-    fetchMessages()
-    setLoading(false)
+    if (profile && bookingId) {
+      fetchBooking()
+      fetchMessages()
+      setLoading(false)
+    }
   }, [profile, bookingId])
 
   if (loading) return <p style={{ padding: '2rem' }}>Loading chat...</p>
   if (!booking || !profile) return <p>Booking or profile not found.</p>
 
-  const isParticipant =
-    booking.dentist_id === profile.id || booking.shifts.practice_id === profile.id
-
+  const isParticipant = booking.dentist_id === profile.id || booking.shifts.practice_id === profile.id
   if (!isParticipant) return <p>You are not authorized to view this chat.</p>
 
   const getSenderLabel = (msg) => {
@@ -104,9 +119,39 @@ export default function ChatPage() {
     return booking.dentist_id === msg.sender_id ? 'Dentist' : 'Practice'
   }
 
+  const bothConfirmed = booking.dentist_confirmed && booking.practice_confirmed
+  const userConfirmed = profile.id === booking.dentist_id
+    ? booking.dentist_confirmed
+    : booking.practice_confirmed
+
   return (
     <div style={{ padding: '2rem' }}>
       <h2>Chat for Shift on {booking.shifts?.shift_date}</h2>
+      <p>Status: {bothConfirmed ? '✅ Booking confirmed' : userConfirmed ? '✅ You’ve confirmed' : 'Pending confirmation'}</p>
+
+      {!bothConfirmed && (
+        <button onClick={confirmBooking} disabled={userConfirmed || confirming}>
+          {userConfirmed ? 'Waiting for other party...' : confirming ? 'Confirming...' : 'Confirm Booking'}
+        </button>
+      )}
+
+      {bothConfirmed && (
+        <div style={{ margin: '1rem 0', padding: '1rem', background: '#e0ffe0', border: '1px solid #8bc34a' }}>
+          <strong>Contact Details:</strong><br />
+          {profile.id === booking.dentist_id ? (
+            <>
+              <p>Email: {booking.practice?.contact_email || 'N/A'}</p>
+              <p>Phone: {booking.practice?.contact_phone || 'N/A'}</p>
+            </>
+          ) : (
+            <>
+              <p>Email: {booking.dentist?.email}</p>
+              {/* add more if available */}
+            </>
+          )}
+        </div>
+      )}
+
       <div style={{
         border: '1px solid #ccc',
         padding: '1rem',
@@ -122,6 +167,7 @@ export default function ChatPage() {
           </div>
         ))}
       </div>
+
       <form onSubmit={(e) => {
         e.preventDefault()
         sendMessage()
