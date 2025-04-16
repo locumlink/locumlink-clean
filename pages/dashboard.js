@@ -1,3 +1,4 @@
+// pages/dashboard.js
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/router'
 import { supabase } from '../utils/supabaseClient'
@@ -13,19 +14,12 @@ export default function Dashboard() {
     const fetchUserAndProfile = async () => {
       if (!session) return
       const user = session.user
-
-      const { data: profileData, error } = await supabase
+      const { data, error } = await supabase
         .from('profiles')
         .select('*')
         .eq('user_id', user.id)
         .single()
-
-      if (error || !profileData) {
-        alert('Could not load profile')
-        return
-      }
-
-      setProfile(profileData)
+      if (!error) setProfile(data)
       setLoading(false)
     }
 
@@ -42,30 +36,23 @@ export default function Dashboard() {
 
       {profile.role === 'dentist' && (
         <>
-          <h2>Your Availability</h2>
-          <p>(Placeholder: Shifts near your postcode will be listed here)</p>
+          <h3>My Bookings</h3>
+          <DentistBookings profile={profile} />
 
-          <h3 style={{ marginTop: '2rem' }}>My Bookings</h3>
-          <DentistBookings dentistId={profile.id} />
-
-          <h3 style={{ marginTop: '2rem' }}>Pending Reviews</h3>
+          <h3>Pending Reviews</h3>
           <PendingReviews profile={profile} />
         </>
       )}
 
       {profile.role === 'practice' && (
         <>
-          <h2>Your Practice Info</h2>
-          <p>Email: {profile.email}</p>
-          <p>Postcode: {profile.postcode}</p>
-
-          <h3 style={{ marginTop: '2rem' }}>Posted Shifts</h3>
+          <h3>Posted Shifts</h3>
           <PracticeShifts practiceId={profile.id} />
 
-          <h3 style={{ marginTop: '2rem' }}>Enquiries Received</h3>
-          <EnquiryList practiceId={profile.id} />
+          <h3>Enquiries Received</h3>
+          <EnquiryList profile={profile} />
 
-          <h3 style={{ marginTop: '2rem' }}>Pending Reviews</h3>
+          <h3>Pending Reviews</h3>
           <PendingReviews profile={profile} />
         </>
       )}
@@ -75,295 +62,181 @@ export default function Dashboard() {
 
 function PracticeShifts({ practiceId }) {
   const [shifts, setShifts] = useState([])
-  const [loading, setLoading] = useState(true)
-
   useEffect(() => {
-    const fetchShifts = async () => {
-      const { data, error } = await supabase
-        .from('shifts')
-        .select('*')
-        .eq('practice_id', practiceId)
-        .order('shift_date', { ascending: true })
-
-      if (!error) setShifts(data)
-      setLoading(false)
-    }
-
-    fetchShifts()
+    supabase
+      .from('shifts')
+      .select('*')
+      .eq('practice_id', practiceId)
+      .order('shift_date', { ascending: true })
+      .then(({ data }) => setShifts(data || []))
   }, [practiceId])
-
-  if (loading) return <p>Loading shifts...</p>
-  if (shifts.length === 0) return <p>No shifts posted yet.</p>
-
   return (
     <ul>
-      {shifts.map((shift) => (
-        <li key={shift.id} style={{ border: '1px solid #ccc', padding: '1rem', margin: '1rem 0' }}>
-          <strong>{shift.shift_date}</strong> – {shift.shift_type}<br />
-          {shift.location} – £{shift.rate}<br />
-          {shift.description}
+      {shifts.map(shift => (
+        <li key={shift.id}>
+          <strong>{shift.shift_date}</strong> — {shift.location}<br />
+          {shift.shift_type} – £{shift.rate}
         </li>
       ))}
     </ul>
   )
 }
 
-function EnquiryList({ practiceId }) {
+function EnquiryList({ profile }) {
   const [bookings, setBookings] = useState([])
-  const [loading, setLoading] = useState(true)
-
-  const handleAccept = async (bookingId) => {
-    const { error } = await supabase
-      .from('bookings')
-      .update({ status: 'accepted' })
-      .eq('id', bookingId)
-
-    if (error) {
-      alert('Error accepting booking')
-      console.error(error)
-    } else {
-      alert('Booking accepted!')
-      setBookings((prev) =>
-        prev.map((b) =>
-          b.id === bookingId ? { ...b, status: 'accepted' } : b
-        )
-      )
-    }
-  }
-
   useEffect(() => {
-    const fetchEnquiries = async () => {
-      const { data, error } = await supabase
+    const fetch = async () => {
+      const { data } = await supabase
         .from('bookings')
         .select(`
-          id,
-          status,
-          shift_id,
-          shifts (
-            id,
-            practice_id,
-            shift_date,
-            location,
-            rate
-          ),
-          dentist:dentist_id (
-            full_name,
-            email
-          )
+          id, status, dentist_confirmed, practice_confirmed,
+          shifts (id, shift_date, location, rate, practice_id),
+          dentist:dentist_id (full_name, email)
         `)
         .order('created_at', { ascending: false })
-
-      if (error) {
-        console.error('Error fetching bookings:', error)
-        setLoading(false)
-        return
-      }
-
-      const filtered = data.filter(
-        (booking) => booking.shifts && booking.shifts.practice_id === practiceId
-      )
-
+      const filtered = (data || []).filter(b => b.shifts?.practice_id === profile.id)
       setBookings(filtered)
-      setLoading(false)
     }
+    fetch()
+  }, [profile.id])
 
-    fetchEnquiries()
-  }, [practiceId])
-
-  if (loading) return <p>Loading enquiries...</p>
-  if (bookings.length === 0) return <p>No enquiries yet.</p>
+  const confirm = async (bookingId) => {
+    await supabase.from('bookings').update({ practice_confirmed: true }).eq('id', bookingId)
+    setBookings(prev => prev.map(b => b.id === bookingId ? { ...b, practice_confirmed: true } : b))
+  }
 
   return (
     <ul>
-      {bookings.map((b) => (
-        <li key={b.id} style={{ border: '1px solid #ccc', padding: '1rem', margin: '1rem 0' }}>
-          <strong>{b.shifts.shift_date}</strong> – {b.shifts.location}<br />
-          Rate: £{b.shifts.rate}<br />
-          <em>Status: {b.status}</em><br />
-
-          {b.status !== 'accepted' && (
+      {bookings.map(b => {
+        const bothConfirmed = b.practice_confirmed && b.dentist_confirmed
+        return (
+          <li key={b.id} style={{ marginBottom: '1rem', border: '1px solid #ccc', padding: '1rem' }}>
+            <strong>{b.shifts.shift_date}</strong> – {b.shifts.location}<br />
+            Rate: £{b.shifts.rate}<br />
+            <em>Status: {b.status}</em><br />
             <a href={`/chat/${b.id}`}>
               <button style={{ marginTop: '0.5rem' }}>Message Dentist</button>
             </a>
-          )}
-
-          {b.status === 'pending' && (
-            <button onClick={() => handleAccept(b.id)} style={{ marginTop: '0.5rem' }}>
-              Accept Booking
-            </button>
-          )}
-
-          {b.status === 'accepted' && (
-            <a href={`/chat/${b.id}`}>
-              <button style={{ marginTop: '0.5rem' }}>Open Chat</button>
-            </a>
-          )}
-          <br /><br />
-          <strong>Dentist:</strong> {b.dentist?.full_name}<br />
-          {b.status === 'accepted' && <span>Email: {b.dentist?.email}</span>}
-        </li>
-      ))}
+            {!b.practice_confirmed && (
+              <button onClick={() => confirm(b.id)} style={{ marginLeft: '1rem' }}>
+                Confirm Booking
+              </button>
+            )}
+            {bothConfirmed && (
+              <>
+                <p><strong>Dentist:</strong> {b.dentist?.full_name}</p>
+                <p>Email: {b.dentist?.email}</p>
+              </>
+            )}
+          </li>
+        )
+      })}
     </ul>
   )
 }
 
-function DentistBookings({ dentistId }) {
+function DentistBookings({ profile }) {
   const [bookings, setBookings] = useState([])
-  const [loading, setLoading] = useState(true)
-
   useEffect(() => {
-    const fetchMyBookings = async () => {
-      const { data, error } = await supabase
+    const fetch = async () => {
+      const { data } = await supabase
         .from('bookings')
         .select(`
-          id,
-          status,
-          shifts (
-            shift_date,
-            location,
-            rate
-          )
+          id, status, practice_confirmed, dentist_confirmed,
+          shifts (shift_date, location, rate)
         `)
-        .eq('dentist_id', dentistId)
+        .eq('dentist_id', profile.id)
         .order('created_at', { ascending: false })
-
-      if (error) {
-        console.error('Error fetching my bookings:', error)
-        setLoading(false)
-        return
-      }
-
-      setBookings(data)
-      setLoading(false)
+      setBookings(data || [])
     }
+    fetch()
+  }, [profile.id])
 
-    fetchMyBookings()
-  }, [dentistId])
-
-  if (loading) return <p>Loading your bookings...</p>
-  if (bookings.length === 0) return <p>You have no bookings yet.</p>
+  const confirm = async (bookingId) => {
+    await supabase.from('bookings').update({ dentist_confirmed: true }).eq('id', bookingId)
+    setBookings(prev => prev.map(b => b.id === bookingId ? { ...b, dentist_confirmed: true } : b))
+  }
 
   return (
     <ul>
-      {bookings.map((b) => (
-        <li key={b.id} style={{ border: '1px solid #ccc', padding: '1rem', margin: '1rem 0' }}>
-          <strong>{b.shifts.shift_date}</strong> – {b.shifts.location}<br />
-          Rate: £{b.shifts.rate}<br />
-          <em>Status: {b.status}</em><br />
-          {b.status === 'accepted' && (
+      {bookings.map(b => {
+        const bothConfirmed = b.practice_confirmed && b.dentist_confirmed
+        return (
+          <li key={b.id} style={{ marginBottom: '1rem', border: '1px solid #ccc', padding: '1rem' }}>
+            <strong>{b.shifts.shift_date}</strong> – {b.shifts.location}<br />
+            Rate: £{b.shifts.rate}<br />
+            <em>Status: {b.status}</em><br />
             <a href={`/chat/${b.id}`}>
               <button style={{ marginTop: '0.5rem' }}>Open Chat</button>
             </a>
-          )}
-        </li>
-      ))}
+            {!b.dentist_confirmed && (
+              <button onClick={() => confirm(b.id)} style={{ marginLeft: '1rem' }}>
+                Confirm Booking
+              </button>
+            )}
+            {bothConfirmed && <p><strong>Booking fully confirmed!</strong></p>}
+          </li>
+        )
+      })}
     </ul>
   )
 }
 
 function PendingReviews({ profile }) {
   const [pending, setPending] = useState([])
-  const [loading, setLoading] = useState(true)
-  const [submitting, setSubmitting] = useState({})
-  const isDentist = profile.role === 'dentist'
-
   useEffect(() => {
-    const fetchPending = async () => {
-      const today = new Date().toISOString().split('T')[0]
-
-      const { data: bookings, error } = await supabase
+    const today = new Date().toISOString().split('T')[0]
+    const load = async () => {
+      const { data: bookings } = await supabase
         .from('bookings')
         .select(`
-          id,
-          dentist_id,
-          shifts (
-            id,
-            shift_date,
-            location,
-            rate,
-            practice_id
-          )
+          id, dentist_id, shifts (id, shift_date, location, rate, practice_id)
         `)
-        .eq(isDentist ? 'dentist_id' : 'practice_id', profile.id)
+        .eq(profile.role === 'dentist' ? 'dentist_id' : 'practice_id', profile.id)
         .eq('status', 'accepted')
-
-      if (error) {
-        console.error('Error fetching bookings:', error)
-        setLoading(false)
-        return
-      }
 
       const { data: reviews } = await supabase
         .from('reviews')
         .select('*')
         .eq('reviewer_id', profile.id)
 
-      const reviewedShiftIds = new Set(reviews.map(r => r.shift_id))
-
-      const pastUnreviewed = bookings.filter(b => {
-        const date = b.shifts?.shift_date
-        return date && date < today && !reviewedShiftIds.has(b.shifts.id)
-      })
-
-      setPending(pastUnreviewed)
-      setLoading(false)
+      const reviewed = new Set(reviews.map(r => r.shift_id))
+      const filtered = bookings.filter(b => b.shifts?.shift_date < today && !reviewed.has(b.shifts.id))
+      setPending(filtered)
     }
-
-    fetchPending()
+    load()
   }, [profile])
 
   const handleSubmit = async (booking, rating, comments) => {
-    setSubmitting(prev => ({ ...prev, [booking.id]: true }))
-
-    const recipientId = isDentist ? booking.shifts.practice_id : booking.dentist_id
-
-    const { error } = await supabase.from('reviews').insert([{
+    await supabase.from('reviews').insert([{
       reviewer_id: profile.id,
-      recipient_id: recipientId,
+      recipient_id: profile.role === 'dentist' ? booking.shifts.practice_id : booking.dentist_id,
       shift_id: booking.shifts.id,
       reviewer_role: profile.role,
-      rating,
-      comments
+      rating, comments
     }])
-
-    if (!error) {
-      setPending(prev => prev.filter(p => p.id !== booking.id))
-    }
-
-    setSubmitting(prev => ({ ...prev, [booking.id]: false }))
+    setPending(prev => prev.filter(p => p.id !== booking.id))
   }
 
-  if (loading) return <p>Loading pending reviews...</p>
-  if (pending.length === 0) return <p>No reviews due right now.</p>
-
+  if (!pending.length) return <p>No reviews due right now.</p>
   return (
     <ul>
-      {pending.map((b) => (
-        <li key={b.id} style={{ border: '1px solid #ccc', padding: '1rem', margin: '1rem 0' }}>
+      {pending.map(b => (
+        <li key={b.id} style={{ marginBottom: '1rem', border: '1px solid #ccc', padding: '1rem' }}>
           <strong>{b.shifts.shift_date}</strong> – {b.shifts.location}<br />
-          Rate: £{b.shifts.rate}<br />
-          <form onSubmit={e => {
+          Rate: £{b.shifts.rate}
+          <form onSubmit={(e) => {
             e.preventDefault()
-            const rating = parseInt(e.target.rating.value)
-            const comments = e.target.comments.value
-            handleSubmit(b, rating, comments)
+            handleSubmit(b, parseInt(e.target.rating.value), e.target.comments.value)
           }}>
-            <label>
-              Rating:
+            <label>Rating:
               <select name="rating" defaultValue="5">
-                {[1, 2, 3, 4, 5].map(r => (
-                  <option key={r} value={r}>{r}</option>
-                ))}
+                {[1, 2, 3, 4, 5].map(n => <option key={n} value={n}>{n}</option>)}
               </select>
-            </label>
+            </label><br />
+            <textarea name="comments" placeholder="Optional comments" />
             <br />
-            <label>
-              Comments:
-              <br />
-              <textarea name="comments" rows="2" style={{ width: '100%' }} />
-            </label>
-            <br />
-            <button type="submit" disabled={submitting[b.id]}>Submit Review</button>
+            <button type="submit">Submit Review</button>
           </form>
         </li>
       ))}
