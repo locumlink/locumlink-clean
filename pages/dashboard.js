@@ -148,12 +148,14 @@ function DentistBookings({ profile }) {
           practice_confirmed,
           dentist_confirmed,
           shifts (
+            id,
             shift_date,
             location,
             rate,
             practice_id
           ),
-          practice:shifts.practice_id (
+          practice:shifts!inner.practice_id (
+            id,
             full_name,
             email,
             phone
@@ -164,9 +166,10 @@ function DentistBookings({ profile }) {
 
       if (error) {
         console.error('Error fetching bookings:', error)
-      } else {
-        setBookings(data || [])
+        return
       }
+
+      setBookings(data || [])
     }
 
     fetch()
@@ -216,6 +219,7 @@ function DentistBookings({ profile }) {
     </ul>
   )
 }
+
 
 
 function PendingReviews({ profile }) {
