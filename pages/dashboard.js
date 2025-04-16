@@ -137,30 +137,64 @@ function EnquiryList({ profile }) {
 
 function DentistBookings({ profile }) {
   const [bookings, setBookings] = useState([])
+
   useEffect(() => {
     const fetch = async () => {
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from('bookings')
         .select(`
-          id, status, practice_confirmed, dentist_confirmed,
-          shifts (shift_date, location, rate)
+          id,
+          status,
+          practice_confirmed,
+          dentist_confirmed,
+          shifts (
+            shift_date,
+            location,
+            rate,
+            practice_id
+          ),
+          practice:shifts.practice_id (
+            full_name,
+            email,
+            phone
+          )
         `)
         .eq('dentist_id', profile.id)
         .order('created_at', { ascending: false })
-      setBookings(data || [])
+
+      if (error) {
+        console.error('Error fetching bookings:', error)
+      } else {
+        setBookings(data || [])
+      }
     }
+
     fetch()
   }, [profile.id])
 
   const confirm = async (bookingId) => {
     await supabase.from('bookings').update({ dentist_confirmed: true }).eq('id', bookingId)
-    setBookings(prev => prev.map(b => b.id === bookingId ? { ...b, dentist_confirmed: true } : b))
+    setBookings(prev =>
+      prev.map(b =>
+        b.id === bookingId ? { ...b, dentist_confirmed: true } : b
+      )
+    )
   }
 
   return (
     <ul>
       {bookings.map(b => {
         const bothConfirmed = b.practice_confirmed && b.dentist_confirmed
+        const contactDetails = bothConfirmed ? (
+          <>
+            <p><strong>Practice Contact:</strong></p>
+            <p>Email: {b.practice?.email || 'N/A'}</p>
+            <p>Phone: {b.practice?.phone || 'N/A'}</p>
+          </>
+        ) : (
+          <p><em>Contact details will appear once booking is confirmed by both sides.</em></p>
+        )
+
         return (
           <li key={b.id} style={{ marginBottom: '1rem', border: '1px solid #ccc', padding: '1rem' }}>
             <strong>{b.shifts.shift_date}</strong> – {b.shifts.location}<br />
@@ -175,12 +209,14 @@ function DentistBookings({ profile }) {
               </button>
             )}
             {bothConfirmed && <p><strong>Booking fully confirmed!</strong></p>}
+            {contactDetails}
           </li>
         )
       })}
     </ul>
   )
 }
+
 
 function PendingReviews({ profile }) {
   const [pending, setPending] = useState([])
