@@ -145,12 +145,13 @@ function DentistBookings({ profile }) {
         .select(`
           id, status, practice_confirmed, dentist_confirmed,
           shifts (
-            shift_date, location, rate, practice_id,
-            practice:practice_id (
-              practice_details (
-                contact_email,
-                contact_phone
-              )
+            shift_date, location, rate, practice_id
+          ),
+          practice:shifts.practice_id (
+            id,
+            practice_details (
+              contact_email,
+              contact_phone
             )
           )
         `)
@@ -185,8 +186,8 @@ function DentistBookings({ profile }) {
     <ul>
       {bookings.map(b => {
         const bothConfirmed = b.practice_confirmed && b.dentist_confirmed
-        const contactEmail = b.shifts?.practice?.practice_details?.contact_email || 'N/A'
-        const contactPhone = b.shifts?.practice?.practice_details?.contact_phone || 'N/A'
+        const contactEmail = b.practice?.practice_details?.contact_email || 'N/A'
+        const contactPhone = b.practice?.practice_details?.contact_phone || 'N/A'
 
         return (
           <li key={b.id} style={{ marginBottom: '1rem', border: '1px solid #ccc', padding: '1rem' }}>
@@ -217,6 +218,7 @@ function DentistBookings({ profile }) {
     </ul>
   )
 }
+
 
 
 function PendingReviews({ profile }) {
