@@ -147,7 +147,7 @@ function DentistBookings({ profile }) {
           shifts (
             shift_date, location, rate, practice_id
           ),
-          practice_details:shifts(practice_id) (
+          practice_details (
             contact_email, contact_phone
           )
         `)
