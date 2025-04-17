@@ -1,5 +1,3 @@
-// pages/chat/[bookingId].js
-
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/router'
 import { supabase } from '../../utils/supabaseClient'
@@ -15,6 +13,7 @@ export default function ChatPage() {
   const [newMessage, setNewMessage] = useState('')
   const [loading, setLoading] = useState(true)
   const [confirming, setConfirming] = useState(false)
+  const [contactDetails, setContactDetails] = useState(null)
 
   const fetchProfile = async () => {
     const { data, error } = await supabase
@@ -32,46 +31,32 @@ export default function ChatPage() {
       .select(`
         *,
         shifts (
-          id,
-          shift_date,
-          location,
-          rate,
-          practice_id,
-          practice_details:practice_id (
-            practice_details (
-              contact_email,
-              contact_phone
-            )
-          )
+          id, shift_date, location, rate, practice_id
         ),
         dentist:dentist_id (
-          id,
-          full_name,
-          email
+          id, full_name, email
         )
       `)
       .eq('id', bookingId)
       .single()
-    console.log('Fetched booking:', data)
-    console.log('Shift practice_id:', data?.shifts?.practice_id)
-    // Fetch contact details from practice_details table
-const practiceId = data?.shifts?.practice_id
-const { data: contactData, error: contactError } = await supabase
-  .from('practice_details')
-  .select('contact_email, contact_phone')
-  .eq('profile_id', practiceId)
-  .single()
-
-if (contactError) {
-  console.error('Error fetching practice contact details:', contactError)
-} else {
-  console.log('Fetched practice contact info:', contactData)
-}
-
-
 
     if (error) return console.error(error)
     setBooking(data)
+
+    // Get contact details using the practice_id
+    const practiceId = data?.shifts?.practice_id
+    if (practiceId) {
+      const { data: contactData, error: contactError } = await supabase
+        .from('practice_details')
+        .select('contact_email, contact_phone')
+        .eq('profile_id', practiceId)
+        .single()
+      if (contactError) {
+        console.error('Error fetching contact info:', contactError)
+      } else {
+        setContactDetails(contactData)
+      }
+    }
   }
 
   const fetchMessages = async () => {
@@ -164,9 +149,6 @@ if (contactError) {
     ? booking.dentist_confirmed
     : booking.practice_confirmed
 
-  const contactEmail = booking.shifts?.practice_details?.contact_email || 'N/A'
-  const contactPhone = booking.shifts?.practice_details?.contact_phone || 'N/A'
-
   return (
     <div style={{ padding: '2rem' }}>
       <h2>Chat for Shift on {booking.shifts?.shift_date}</h2>
@@ -183,13 +165,12 @@ if (contactError) {
           <strong>Contact Details:</strong><br />
           {profile.id === booking.dentist_id ? (
             <>
-              <p>Email: {contactEmail}</p>
-              <p>Phone: {contactPhone}</p>
+              <p>Email: {contactDetails?.contact_email || 'N/A'}</p>
+              <p>Phone: {contactDetails?.contact_phone || 'N/A'}</p>
             </>
           ) : (
             <>
-              <p>Email: {booking.dentist?.email}</p>
-              {/* Add phone if collected later */}
+              <p>Email: {booking.dentist?.email || 'N/A'}</p>
             </>
           )}
         </div>
