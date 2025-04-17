@@ -136,7 +136,7 @@ function EnquiryList({ profile }) {
 }
 
 function DentistBookings({ profile }) {
-  const [bookings, setBookings] = useState([]);
+  const [bookings, setBookings] = useState([])
 
   useEffect(() => {
     const fetch = async () => {
@@ -145,72 +145,79 @@ function DentistBookings({ profile }) {
         .select(`
           id, status, practice_confirmed, dentist_confirmed,
           shifts (
-            shift_date, location, rate, practice_id
-          ),
-          practice_details:shifts(practice_id) (
-            contact_email, contact_phone
+            shift_date, location, rate, practice_id,
+            practice:practice_id (
+              practice_details (
+                contact_email,
+                contact_phone
+              )
+            )
           )
         `)
         .eq('dentist_id', profile.id)
-        .order('created_at', { ascending: false });
+        .order('created_at', { ascending: false })
 
       if (error) {
-        console.error('Error fetching bookings:', error);
+        console.error('Error fetching bookings:', error)
       }
 
-      setBookings(data || []);
-    };
+      setBookings(data || [])
+    }
 
-    fetch();
-  }, [profile.id]);
+    fetch()
+  }, [profile.id])
 
   const confirm = async (bookingId) => {
     await supabase
       .from('bookings')
       .update({ dentist_confirmed: true })
-      .eq('id', bookingId);
+      .eq('id', bookingId)
 
     setBookings(prev =>
-      prev.map(b =>
-        b.id === bookingId ? { ...b, dentist_confirmed: true } : b
+      prev.map(b => b.id === bookingId
+        ? { ...b, dentist_confirmed: true }
+        : b
       )
-    );
-  };
+    )
+  }
 
   return (
     <ul>
       {bookings.map(b => {
-        const bothConfirmed = b.practice_confirmed && b.dentist_confirmed;
-        const contactEmail = b.practice_details?.contact_email || 'N/A';
-        const contactPhone = b.practice_details?.contact_phone || 'N/A';
+        const bothConfirmed = b.practice_confirmed && b.dentist_confirmed
+        const contactEmail = b.shifts?.practice?.practice_details?.contact_email || 'N/A'
+        const contactPhone = b.shifts?.practice?.practice_details?.contact_phone || 'N/A'
 
         return (
           <li key={b.id} style={{ marginBottom: '1rem', border: '1px solid #ccc', padding: '1rem' }}>
             <strong>{b.shifts.shift_date}</strong> – {b.shifts.location}<br />
             Rate: £{b.shifts.rate}<br />
             <em>Status: {b.status}</em><br />
+
             <a href={`/chat/${b.id}`}>
               <button style={{ marginTop: '0.5rem' }}>Open Chat</button>
             </a>
+
             {!b.dentist_confirmed && (
               <button onClick={() => confirm(b.id)} style={{ marginLeft: '1rem' }}>
                 Confirm Booking
               </button>
             )}
+
             {bothConfirmed && (
               <>
                 <p><strong>Booking fully confirmed!</strong></p>
-                <p><strong>Practice Contact:</strong></p>
                 <p>Email: {contactEmail}</p>
                 <p>Phone: {contactPhone}</p>
               </>
             )}
           </li>
-        );
+        )
       })}
     </ul>
-  );
+  )
 }
+
 
 function PendingReviews({ profile }) {
   const [pending, setPending] = useState([])
