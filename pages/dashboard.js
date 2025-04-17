@@ -217,3 +217,66 @@ function DentistBookings({ profile }) {
     </ul>
   )
 }
+function PendingReviews({ profile }) {
+  const [pending, setPending] = useState([])
+  useEffect(() => {
+    const today = new Date().toISOString().split('T')[0]
+    const load = async () => {
+      const { data: bookings } = await supabase
+        .from('bookings')
+        .select(`
+          id, dentist_id, shifts (id, shift_date, location, rate, practice_id)
+        `)
+        .eq(profile.role === 'dentist' ? 'dentist_id' : 'practice_id', profile.id)
+        .eq('status', 'accepted')
+
+      const { data: reviews } = await supabase
+        .from('reviews')
+        .select('*')
+        .eq('reviewer_id', profile.id)
+
+      const reviewed = new Set(reviews.map(r => r.shift_id))
+      const filtered = bookings.filter(b => b.shifts?.shift_date < today && !reviewed.has(b.shifts.id))
+      setPending(filtered)
+    }
+    load()
+  }, [profile])
+
+  const handleSubmit = async (booking, rating, comments) => {
+    await supabase.from('reviews').insert([{
+      reviewer_id: profile.id,
+      recipient_id: profile.role === 'dentist' ? booking.shifts.practice_id : booking.dentist_id,
+      shift_id: booking.shifts.id,
+      reviewer_role: profile.role,
+      rating,
+      comments
+    }])
+    setPending(prev => prev.filter(p => p.id !== booking.id))
+  }
+
+  if (!pending.length) return <p>No reviews due right now.</p>
+
+  return (
+    <ul>
+      {pending.map(b => (
+        <li key={b.id} style={{ marginBottom: '1rem', border: '1px solid #ccc', padding: '1rem' }}>
+          <strong>{b.shifts.shift_date}</strong> – {b.shifts.location}<br />
+          Rate: £{b.shifts.rate}
+          <form onSubmit={(e) => {
+            e.preventDefault()
+            handleSubmit(b, parseInt(e.target.rating.value), e.target.comments.value)
+          }}>
+            <label>Rating:
+              <select name="rating" defaultValue="5">
+                {[1, 2, 3, 4, 5].map(n => <option key={n} value={n}>{n}</option>)}
+              </select>
+            </label><br />
+            <textarea name="comments" placeholder="Optional comments" />
+            <br />
+            <button type="submit">Submit Review</button>
+          </form>
+        </li>
+      ))}
+    </ul>
+  )
+}
