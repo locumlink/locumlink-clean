@@ -1,3 +1,5 @@
+// pages/chat/[bookingId].js
+
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/router'
 import { supabase } from '../../utils/supabaseClient'
@@ -13,7 +15,6 @@ export default function ChatPage() {
   const [newMessage, setNewMessage] = useState('')
   const [loading, setLoading] = useState(true)
   const [confirming, setConfirming] = useState(false)
-  const [contactDetails, setContactDetails] = useState(null)
 
   const fetchProfile = async () => {
     const { data, error } = await supabase
@@ -41,22 +42,17 @@ export default function ChatPage() {
       .single()
 
     if (error) return console.error(error)
-    setBooking(data)
 
-    // Get contact details using the practice_id
+    // Get contact info manually
     const practiceId = data?.shifts?.practice_id
-    if (practiceId) {
-      const { data: contactData, error: contactError } = await supabase
-        .from('practice_details')
-        .select('contact_email, contact_phone')
-        .eq('profile_id', practiceId)
-        .single()
-      if (contactError) {
-        console.error('Error fetching contact info:', contactError)
-      } else {
-        setContactDetails(contactData)
-      }
-    }
+    const { data: contactData } = await supabase
+      .from('practice_details')
+      .select('contact_email, contact_phone')
+      .eq('profile_id', practiceId)
+      .single()
+
+    data.practice_contact = contactData || {}
+    setBooking(data)
   }
 
   const fetchMessages = async () => {
@@ -70,19 +66,13 @@ export default function ChatPage() {
   }
 
   const containsContactInfo = (text) => {
-    const contactPatterns = [
-      /\b\d{10,}\b/,
-      /\b0\d{9,}\b/,
-      /\+44\s?\d{9,}/,
-      /@\w+\.\w+/,
-      /\bemail\b/i,
-      /\bphone\b/i,
-      /\bcall me\b/i,
-      /\btext me\b/i,
-      /\bmessage me\b/i,
+    const patterns = [
+      /\b\d{10,}\b/, /\b0\d{9,}\b/, /\+44\s?\d{9,}/,
+      /@\w+\.\w+/, /\bemail\b/i, /\bphone\b/i,
+      /\bcall me\b/i, /\btext me\b/i, /\bmessage me\b/i,
       /instagram|facebook|snapchat|tiktok|twitter/i,
     ]
-    return contactPatterns.some((regex) => regex.test(text))
+    return patterns.some((regex) => regex.test(text))
   }
 
   const sendMessage = async () => {
@@ -106,13 +96,27 @@ export default function ChatPage() {
 
   const confirmBooking = async () => {
     setConfirming(true)
+
     const columnToUpdate = booking.dentist_id === profile.id
       ? 'dentist_confirmed'
       : 'practice_confirmed'
 
+    const updateFields = { [columnToUpdate]: true }
+
+    // If this confirmation completes both sides, record final date and rate
+    const nowConfirmed = {
+      dentist: booking.dentist_confirmed || columnToUpdate === 'dentist_confirmed',
+      practice: booking.practice_confirmed || columnToUpdate === 'practice_confirmed'
+    }
+
+    if (nowConfirmed.dentist && nowConfirmed.practice) {
+      updateFields.confirmed_date = booking.shifts?.shift_date
+      updateFields.confirmed_rate = booking.shifts?.rate
+    }
+
     const { error } = await supabase
       .from('bookings')
-      .update({ [columnToUpdate]: true })
+      .update(updateFields)
       .eq('id', bookingId)
 
     if (!error) fetchBooking()
@@ -139,15 +143,17 @@ export default function ChatPage() {
   const isParticipant = booking.dentist_id === profile.id || booking.shifts.practice_id === profile.id
   if (!isParticipant) return <p>You are not authorized to view this chat.</p>
 
-  const getSenderLabel = (msg) => {
-    if (msg.sender_id === profile.id) return 'You'
-    return booking.dentist_id === msg.sender_id ? 'Dentist' : 'Practice'
-  }
-
   const bothConfirmed = booking.dentist_confirmed && booking.practice_confirmed
   const userConfirmed = profile.id === booking.dentist_id
     ? booking.dentist_confirmed
     : booking.practice_confirmed
+
+  const contactEmail = booking.practice_contact?.contact_email || 'N/A'
+  const contactPhone = booking.practice_contact?.contact_phone || 'N/A'
+
+  const getSenderLabel = (msg) =>
+    msg.sender_id === profile.id ? 'You' :
+    booking.dentist_id === msg.sender_id ? 'Dentist' : 'Practice'
 
   return (
     <div style={{ padding: '2rem' }}>
@@ -165,14 +171,17 @@ export default function ChatPage() {
           <strong>Contact Details:</strong><br />
           {profile.id === booking.dentist_id ? (
             <>
-              <p>Email: {contactDetails?.contact_email || 'N/A'}</p>
-              <p>Phone: {contactDetails?.contact_phone || 'N/A'}</p>
+              <p>Email: {contactEmail}</p>
+              <p>Phone: {contactPhone}</p>
             </>
           ) : (
             <>
-              <p>Email: {booking.dentist?.email || 'N/A'}</p>
+              <p>Email: {booking.dentist?.email}</p>
+              {/* Add more if needed */}
             </>
           )}
+          <p><strong>Finalised Rate:</strong> £{booking.confirmed_rate}</p>
+          <p><strong>Date:</strong> {booking.confirmed_date}</p>
         </div>
       )}
 
