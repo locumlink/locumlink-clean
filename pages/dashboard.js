@@ -139,16 +139,16 @@ function DentistBookings({ profile }) {
   const [bookings, setBookings] = useState([]);
 
   useEffect(() => {
-    const fetch = async () => {
+    const fetchBookings = async () => {
       const { data, error } = await supabase
         .from('bookings')
         .select(`
           id, status, practice_confirmed, dentist_confirmed,
           shifts (
-            shift_date, location, rate, practice_id
-          ),
-          practice_details (
-            contact_email, contact_phone
+            shift_date, location, rate, practice_id,
+            practice_details:practice_id (
+              contact_email, contact_phone
+            )
           )
         `)
         .eq('dentist_id', profile.id)
@@ -156,12 +156,14 @@ function DentistBookings({ profile }) {
 
       if (error) {
         console.error('Error fetching bookings:', error);
+      } else {
+        console.log('Fetched bookings:', data);
       }
 
       setBookings(data || []);
     };
 
-    fetch();
+    fetchBookings();
   }, [profile.id]);
 
   const confirm = async (bookingId) => {
@@ -181,13 +183,13 @@ function DentistBookings({ profile }) {
     <ul>
       {bookings.map(b => {
         const bothConfirmed = b.practice_confirmed && b.dentist_confirmed;
-        const contactEmail = b.practice_details?.contact_email || 'N/A';
-        const contactPhone = b.practice_details?.contact_phone || 'N/A';
+        const contactEmail = b.shifts?.practice_details?.contact_email || 'N/A';
+        const contactPhone = b.shifts?.practice_details?.contact_phone || 'N/A';
 
         return (
           <li key={b.id} style={{ marginBottom: '1rem', border: '1px solid #ccc', padding: '1rem' }}>
-            <strong>{b.shifts.shift_date}</strong> – {b.shifts.location}<br />
-            Rate: £{b.shifts.rate}<br />
+            <strong>{b.shifts?.shift_date}</strong> – {b.shifts?.location}<br />
+            Rate: £{b.shifts?.rate}<br />
             <em>Status: {b.status}</em><br />
             <a href={`/chat/${b.id}`}>
               <button style={{ marginTop: '0.5rem' }}>Open Chat</button>
