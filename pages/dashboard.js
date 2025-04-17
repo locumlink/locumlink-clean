@@ -134,7 +134,6 @@ function EnquiryList({ profile }) {
     </ul>
   )
 }
-
 function DentistBookings({ profile }) {
   const [bookings, setBookings] = useState([])
 
@@ -146,13 +145,6 @@ function DentistBookings({ profile }) {
           id, status, practice_confirmed, dentist_confirmed,
           shifts (
             shift_date, location, rate, practice_id
-          ),
-          practice:shifts.practice_id (
-            id,
-            practice_details (
-              contact_email,
-              contact_phone
-            )
           )
         `)
         .eq('dentist_id', profile.id)
@@ -160,56 +152,70 @@ function DentistBookings({ profile }) {
 
       if (error) {
         console.error('Error fetching bookings:', error)
+        return
       }
 
-      setBookings(data || [])
+      // Get practice IDs
+      const practiceIds = [...new Set(data.map(b => b.shifts?.practice_id).filter(Boolean))]
+      const { data: contacts, error: contactError } = await supabase
+        .from('practice_details')
+        .select('profile_id, contact_email, contact_phone')
+        .in('profile_id', practiceIds)
+
+      if (contactError) {
+        console.error('Error fetching practice details:', contactError)
+        return
+      }
+
+      const contactMap = {}
+      contacts.forEach(c => {
+        contactMap[c.profile_id] = {
+          email: c.contact_email,
+          phone: c.contact_phone
+        }
+      })
+
+      const merged = data.map(b => {
+        const practiceId = b.shifts?.practice_id
+        return {
+          ...b,
+          contact: contactMap[practiceId] || { email: 'N/A', phone: 'N/A' }
+        }
+      })
+
+      setBookings(merged)
     }
 
     fetch()
   }, [profile.id])
 
   const confirm = async (bookingId) => {
-    await supabase
-      .from('bookings')
-      .update({ dentist_confirmed: true })
-      .eq('id', bookingId)
-
-    setBookings(prev =>
-      prev.map(b => b.id === bookingId
-        ? { ...b, dentist_confirmed: true }
-        : b
-      )
-    )
+    await supabase.from('bookings').update({ dentist_confirmed: true }).eq('id', bookingId)
+    setBookings(prev => prev.map(b => b.id === bookingId ? { ...b, dentist_confirmed: true } : b))
   }
 
   return (
     <ul>
       {bookings.map(b => {
         const bothConfirmed = b.practice_confirmed && b.dentist_confirmed
-        const contactEmail = b.practice?.practice_details?.contact_email || 'N/A'
-        const contactPhone = b.practice?.practice_details?.contact_phone || 'N/A'
-
         return (
           <li key={b.id} style={{ marginBottom: '1rem', border: '1px solid #ccc', padding: '1rem' }}>
             <strong>{b.shifts.shift_date}</strong> – {b.shifts.location}<br />
             Rate: £{b.shifts.rate}<br />
             <em>Status: {b.status}</em><br />
-
             <a href={`/chat/${b.id}`}>
               <button style={{ marginTop: '0.5rem' }}>Open Chat</button>
             </a>
-
             {!b.dentist_confirmed && (
               <button onClick={() => confirm(b.id)} style={{ marginLeft: '1rem' }}>
                 Confirm Booking
               </button>
             )}
-
             {bothConfirmed && (
               <>
                 <p><strong>Booking fully confirmed!</strong></p>
-                <p>Email: {contactEmail}</p>
-                <p>Phone: {contactPhone}</p>
+                <p>Email: {b.contact.email}</p>
+                <p>Phone: {b.contact.phone}</p>
               </>
             )}
           </li>
