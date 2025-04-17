@@ -141,18 +141,18 @@ function DentistBookings({ profile }) {
   useEffect(() => {
     const fetch = async () => {
       const { data, error } = await supabase
-        .from('bookings')
-        .select(`
-          id, status, practice_confirmed, dentist_confirmed,
-          shifts (
-            shift_date, location, rate, practice_id
-          ),
-          practice_details:shifts(practice_id) (
-            contact_email, contact_phone
-          )
-        `)
-        .eq('dentist_id', profile.id)
-        .order('created_at', { ascending: false })
+  .from('bookings')
+  .select(`
+    id, status, practice_confirmed, dentist_confirmed,
+    shifts (
+      shift_date, location, rate, practice_id
+    ),
+    practice_details (
+      contact_email, contact_phone
+    )
+  `)
+  .eq('dentist_id', profile.id)
+  .order('created_at', { ascending: false });
 
       if (error) {
         console.error('Error fetching bookings:', error)
