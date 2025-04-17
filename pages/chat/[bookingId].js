@@ -1,3 +1,5 @@
+// pages/chat/[bookingId].js
+
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/router'
 import { supabase } from '../../utils/supabaseClient'
@@ -27,9 +29,30 @@ export default function ChatPage() {
   const fetchBooking = async () => {
     const { data, error } = await supabase
       .from('bookings')
-      .select('*, shifts(*), dentist:dentist_id(*), practice:shifts(practice_id)')
+      .select(`
+        *,
+        shifts (
+          id,
+          shift_date,
+          location,
+          rate,
+          practice_id,
+          practice_details:practice_id (
+            practice_details (
+              contact_email,
+              contact_phone
+            )
+          )
+        ),
+        dentist:dentist_id (
+          id,
+          full_name,
+          email
+        )
+      `)
       .eq('id', bookingId)
       .single()
+
     if (error) return console.error(error)
     setBooking(data)
   }
@@ -124,6 +147,9 @@ export default function ChatPage() {
     ? booking.dentist_confirmed
     : booking.practice_confirmed
 
+  const contactEmail = booking.shifts?.practice_details?.contact_email || 'N/A'
+  const contactPhone = booking.shifts?.practice_details?.contact_phone || 'N/A'
+
   return (
     <div style={{ padding: '2rem' }}>
       <h2>Chat for Shift on {booking.shifts?.shift_date}</h2>
@@ -140,13 +166,13 @@ export default function ChatPage() {
           <strong>Contact Details:</strong><br />
           {profile.id === booking.dentist_id ? (
             <>
-              <p>Email: {booking.practice?.contact_email || 'N/A'}</p>
-              <p>Phone: {booking.practice?.contact_phone || 'N/A'}</p>
+              <p>Email: {contactEmail}</p>
+              <p>Phone: {contactPhone}</p>
             </>
           ) : (
             <>
               <p>Email: {booking.dentist?.email}</p>
-              {/* add more if available */}
+              {/* Add phone if collected later */}
             </>
           )}
         </div>
