@@ -52,6 +52,23 @@ export default function ChatPage() {
       `)
       .eq('id', bookingId)
       .single()
+    console.log('Fetched booking:', data)
+    console.log('Shift practice_id:', data?.shifts?.practice_id)
+    // Fetch contact details from practice_details table
+const practiceId = data?.shifts?.practice_id
+const { data: contactData, error: contactError } = await supabase
+  .from('practice_details')
+  .select('contact_email, contact_phone')
+  .eq('profile_id', practiceId)
+  .single()
+
+if (contactError) {
+  console.error('Error fetching practice contact details:', contactError)
+} else {
+  console.log('Fetched practice contact info:', contactData)
+}
+
+
 
     if (error) return console.error(error)
     setBooking(data)
