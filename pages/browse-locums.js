@@ -55,8 +55,8 @@ export default function BrowseLocums() {
         <p><strong>Experience:</strong> {details.uk_experience || 'N/A'} years</p>
         <p><strong>Skills:</strong> {details.additional_skills?.join(', ') || 'N/A'}</p>
         <p><strong>Availability:</strong> {details.locum_type || 'N/A'}</p>
-        <p><strong>Prefers:</strong> {details.nhs_private_preference || 'N/A'}</p>
-        <p><strong>Rate:</strong> £{details.min_rate || '?'} – £{details.max_rate || '?'}/day</p>
+        <p><strong>Prefers:</strong> {details.nhs_preference || 'N/A'}</p>
+        <p><strong>Rate:</strong> £{details.rate_min || '?'} – £{details.rate_max || '?'}/day</p>
         <button className="mt-2 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">
           Propose Shift
         </button>
