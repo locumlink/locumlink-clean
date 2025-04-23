@@ -17,11 +17,12 @@ export default function BrowseLocums() {
         postcode,
         dentist_details (
           uk_experience,
+          year_qualified,
           additional_skills,
           locum_type,
-          nhs_private_preference,
-          min_rate,
-          max_rate
+          nhs_preference,
+          rate_min,
+          rate_max
         )
       `)
       .eq('role', 'dentist')
