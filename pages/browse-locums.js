@@ -8,35 +8,39 @@ export default function BrowseLocums() {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    const fetchLocums = async () => {
-      const { data, error } = await supabase
-        .from('profiles')
-        .select(`
-          id,
-          role,
-          postcode,
-          dentist_details (
-            uk_experience,
-            additional_skills,
-            locum_type,
-            nhs_private_preference,
-            min_rate,
-            max_rate
-          )
-        `)
-        .eq('role', 'dentist')
+  const fetchLocums = async () => {
+    const { data, error } = await supabase
+      .from('profiles')
+      .select(`
+        id,
+        role,
+        postcode,
+        dentist_details (
+          uk_experience,
+          additional_skills,
+          locum_type,
+          nhs_private_preference,
+          min_rate,
+          max_rate
+        )
+      `)
+      .eq('role', 'dentist')
 
-      if (error) {
-        console.error('Error fetching locums:', error)
-      } else {
-        setLocums(data)
-      }
+    console.log('Returned locums data:', data)
+    console.log('Error (if any):', error)
 
-      setLoading(false)
+    if (error) {
+      console.error('Error fetching locums:', error)
+    } else {
+      setLocums(data)
     }
 
-    fetchLocums()
-  }, [])
+    setLoading(false)
+  }
+
+  fetchLocums()
+}, [])
+
 
   const renderLocumCard = (locum, index) => {
     const details = locum.dentist_details || {}
